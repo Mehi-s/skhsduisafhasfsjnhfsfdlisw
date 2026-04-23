@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-YouTube Video Downloader using yt-dlp
+YouTube Video Downloader using yt-dlp with proxy support
 Processes commands from commands.txt file
 """
 
@@ -9,13 +9,41 @@ import os
 import re
 import json
 import subprocess
+import random
+import time
 from pathlib import Path
 from datetime import datetime
+from urllib.parse import urlparse
 
 # Configuration
 COMMANDS_FILE = "../commands.txt"
 RESULTS_DIR = "../results"
 DOWNLOAD_DIR = "../results/downloads"
+
+# List of free proxy servers (you can add more)
+PROXY_LIST = [
+    None,  # No proxy (direct connection)
+    "http://proxy1.example.com:8080",
+    "http://proxy2.example.com:3128",
+    "socks5://proxy3.example.com:1080",
+]
+
+# User agents to rotate
+USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15',
+]
+
+def get_random_user_agent():
+    """Return a random user agent"""
+    return random.choice(USER_AGENTS)
+
+def get_random_proxy():
+    """Return a random proxy from the list"""
+    return random.choice(PROXY_LIST)
 
 def setup_directories():
     """Create necessary directories"""
@@ -46,7 +74,6 @@ def read_commands():
             url = line[9:].strip()
             commands.append(('download', url))
         elif line.startswith('recent '):
-            # Handle "recent 15 @channel" format
             value = line[7:].strip()
             commands.append(('recent', value))
         elif line.startswith('playlist '):
@@ -55,16 +82,119 @@ def read_commands():
     
     return commands
 
-def search_videos(query, max_results=10):
-    """Search YouTube for videos"""
+def download_video_with_proxy(url, output_template=None, use_proxy=True):
+    """
+    Download a video using yt-dlp with proxy support to avoid bot detection
+    
+    Args:
+        url: YouTube video URL
+        output_template: Output filename template
+        use_proxy: Whether to use proxy rotation
+    
+    Returns:
+        bool: Success status
+    """
+    print(f"\n📥 Downloading: {url}")
+    
+    if output_template is None:
+        output_template = f"{DOWNLOAD_DIR}/%(title)s_%(id)s.%(ext)s"
+    
+    # Get random user agent
+    user_agent = get_random_user_agent()
+    
+    # Configure yt-dlp options to avoid bot detection
+    ydl_opts = {
+        'format': 'worst[height>=360]',  # Limit to 360p to save space and bandwidth
+        'outtmpl': output_template,
+        'quiet': False,
+        'no_warnings': False,
+        'restrictfilenames': True,
+        'user_agent': user_agent,
+        'extractor_args': {
+            'youtube': {
+                'skip': ['dash', 'hls'],  # Skip certain formats
+                'player_client': ['android', 'web'],  # Use different clients
+            }
+        },
+        'throttledratelimit': 1000000,  # 1 MB/s limit to avoid detection
+        'retries': 10,
+        'fragment_retries': 10,
+        'sleep_interval': random.uniform(1, 3),  # Random sleep between requests
+        'sleep_interval_requests': random.uniform(0.5, 1.5),
+    }
+    
+    # Add proxy if enabled
+    if use_proxy:
+        proxy = get_random_proxy()
+        if proxy:
+            ydl_opts['proxy'] = proxy
+            print(f"  Using proxy: {proxy}")
+    
+    # Add additional headers to look more like a real browser
+    ydl_opts['headers'] = {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Cache-Control': 'max-age=0',
+    }
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
+            
+            # Save metadata
+            metadata = {
+                'title': info.get('title', 'N/A'),
+                'url': url,
+                'duration': info.get('duration', 0),
+                'upload_date': info.get('upload_date', 'N/A'),
+                'views': info.get('view_count', 0),
+                'likes': info.get('like_count', 0),
+                'filename': filename,
+                'user_agent': user_agent,
+                'proxy_used': ydl_opts.get('proxy', 'None')
+            }
+            
+            metadata_file = Path(RESULTS_DIR) / f"download_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            with open(metadata_file, 'w', encoding='utf-8') as f:
+                json.dump(metadata, f, indent=2, ensure_ascii=False)
+            
+            print(f"✅ Downloaded: {info.get('title')}")
+            return True
+            
+    except Exception as e:
+        print(f"❌ Error downloading: {str(e)}")
+        if "429" in str(e) or "rate limit" in str(e).lower():
+            print("  Rate limited detected! Consider using a different proxy or adding more proxies to the list.")
+        return False
+
+def search_videos(query, max_results=10, use_proxy=True):
+    """Search YouTube for videos with proxy support"""
     print(f"\n🔍 Searching for: {query}")
+    
+    user_agent = get_random_user_agent()
     
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
         'extract_flat': True,
         'force_generic_extractor': False,
+        'user_agent': user_agent,
+        'sleep_interval': random.uniform(0.5, 1),
     }
+    
+    if use_proxy:
+        proxy = get_random_proxy()
+        if proxy:
+            ydl_opts['proxy'] = proxy
+            print(f"  Using proxy: {proxy}")
     
     results = []
     try:
@@ -109,180 +239,54 @@ def search_videos(query, max_results=10):
         print(f"❌ Error searching: {str(e)}")
         return []
 
-def download_video(url, output_template=None):
-    """Download a single video"""
-    print(f"\n📥 Downloading: {url}")
-    
-    if output_template is None:
-        output_template = f"{DOWNLOAD_DIR}/%(title)s_%(id)s.%(ext)s"
-    
-    ydl_opts = {
-        'format': 'worst[height>=360]',  # Limit to 720p to save space
-        'outtmpl': output_template,
-        'quiet': False,
-        'no_warnings': False,
-        'restrictfilenames': True,
-    }
-    
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
-            
-            # Save metadata
-            metadata = {
-                'title': info.get('title', 'N/A'),
-                'url': url,
-                'duration': info.get('duration', 0),
-                'upload_date': info.get('upload_date', 'N/A'),
-                'views': info.get('view_count', 0),
-                'likes': info.get('like_count', 0),
-                'filename': filename
-            }
-            
-            metadata_file = Path(RESULTS_DIR) / f"download_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-            with open(metadata_file, 'w', encoding='utf-8') as f:
-                json.dump(metadata, f, indent=2, ensure_ascii=False)
-            
-            print(f"✅ Downloaded: {info.get('title')}")
-            return True
-            
-    except Exception as e:
-        print(f"❌ Error downloading: {str(e)}")
-        return False
-
-def get_recent_videos_alternative(channel_url, count=10):
-    """Alternative method using search to get recent videos"""
-    results = []
-    
-    try:
-        # Extract channel ID first
-        ydl_opts = {'quiet': True, 'extract_flat': True}
-        
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Get channel info
-            if not channel_url.startswith('http'):
-                channel_url = f"https://youtube.com/@{channel_url}"
-            
-            info = ydl.extract_info(channel_url, download=False)
-            channel_name = info.get('uploader', info.get('channel', info.get('title', '')))
-            channel_id = info.get('channel_id', info.get('id', ''))
-            
-            if channel_name:
-                # Search for videos from this channel (most recent first)
-                search_query = f"from:{channel_name}"
-                search_url = f"ytsearch{count}:{search_query}"
-                
-                search_info = ydl.extract_info(search_url, download=False)
-                
-                if 'entries' in search_info:
-                    for entry in search_info['entries']:
-                        if entry:
-                            result = {
-                                'title': entry.get('title', 'N/A'),
-                                'url': f"https://youtube.com/watch?v={entry.get('id', '')}",
-                                'video_id': entry.get('id', ''),
-                                'duration': entry.get('duration', 0),
-                                'views': entry.get('view_count', 0),
-                                'upload_date': entry.get('upload_date', 'N/A'),
-                                'uploader': channel_name
-                            }
-                            results.append(result)
-                            
-    except Exception as e:
-        print(f"  Alternative method failed: {str(e)}")
-    
-    return results
-
-def get_recent_videos(channel_url, count=10):
-    """Get recent videos from a channel"""
+def get_recent_videos(channel_url, count=10, use_proxy=True):
+    """Get recent videos from a channel with proxy support"""
     print(f"\n📺 Getting recent videos from: {channel_url}")
     
-    # Different approaches to try
-    approaches = []
+    user_agent = get_random_user_agent()
     
     # Normalize the channel URL
-    original_channel = channel_url
     if not channel_url.startswith('http'):
-        # Remove @ symbol if present for building URLs
         clean_channel = channel_url.replace('@', '')
-        approaches = [
-            f"https://www.youtube.com/@{clean_channel}/videos",
-            f"https://www.youtube.com/c/{clean_channel}/videos",
-            f"https://www.youtube.com/channel/{clean_channel}/videos",
-            f"https://www.youtube.com/@{clean_channel}",
-            f"https://www.youtube.com/{clean_channel}/videos",
-        ]
+        target_url = f"https://www.youtube.com/@{clean_channel}/videos"
     else:
-        # If it's already a URL, make sure it points to videos tab
-        if '/videos' not in channel_url:
-            channel_url = channel_url.rstrip('/') + '/videos'
-        approaches = [channel_url]
+        target_url = channel_url
     
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
-        'ignoreerrors': True,  # Skip any problematic entries
-        'extract_flat': 'in_playlist',  # More efficient for playlists
+        'ignoreerrors': True,
+        'extract_flat': 'in_playlist',
+        'user_agent': user_agent,
+        'sleep_interval': random.uniform(0.5, 1),
     }
+    
+    if use_proxy:
+        proxy = get_random_proxy()
+        if proxy:
+            ydl_opts['proxy'] = proxy
+            print(f"  Using proxy: {proxy}")
     
     results = []
     
-    for url in approaches:
-        if results and len(results) >= count:  # If we already got enough results, stop trying
-            break
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(target_url, download=False)
             
-        print(f"  Trying: {url}")
-        
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
+            entries = []
+            if 'entries' in info:
+                entries = info['entries']
+            
+            # Extract video information
+            for entry in entries:
+                if entry is None or len(results) >= count:
+                    break
                 
-                # Handle different response structures
-                entries = []
-                if 'entries' in info:
-                    entries = info['entries']
-                elif 'videos' in info:
-                    entries = info['videos']
-                else:
-                    # Try to get uploads playlist ID
-                    uploads_id = None
-                    if 'uploader_id' in info:
-                        uploads_id = info.get('uploader_id')
-                    elif 'channel_id' in info:
-                        uploads_id = info.get('channel_id')
-                    
-                    if uploads_id:
-                        # Get uploads playlist
-                        uploads_playlist = f"https://www.youtube.com/channel/{uploads_id}/videos"
-                        info2 = ydl.extract_info(uploads_playlist, download=False)
-                        if 'entries' in info2:
-                            entries = info2['entries']
-                
-                # Extract video information
-                for entry in entries:
-                    if entry is None:
-                        continue
-                        
-                    if len(results) >= count:
-                        break
-                    
-                    # Handle different ID formats
-                    video_id = entry.get('id', '')
-                    if video_id and '/' in video_id:
-                        video_id = video_id.split('/')[-1]
-                    
-                    # Get video URL
-                    if 'url' in entry and entry['url']:
-                        video_url = entry['url']
-                    elif video_id:
-                        video_url = f"https://youtube.com/watch?v={video_id}"
-                    else:
-                        continue
-                    
+                video_id = entry.get('id', '')
+                if video_id:
                     result = {
                         'title': entry.get('title', 'N/A'),
-                        'url': video_url,
+                        'url': f"https://youtube.com/watch?v={video_id}",
                         'video_id': video_id,
                         'duration': entry.get('duration', 0),
                         'views': entry.get('view_count', 0),
@@ -291,19 +295,9 @@ def get_recent_videos(channel_url, count=10):
                     }
                     results.append(result)
                     
-        except Exception as e:
-            print(f"  Failed with error: {str(e)}")
-            continue
-    
-    # If we still don't have enough videos, try alternative extraction method
-    if len(results) < count:
-        print(f"  Only got {len(results)} videos, trying alternative method...")
-        alt_results = get_recent_videos_alternative(original_channel, count)
-        # Merge results without duplicates
-        existing_urls = {r['url'] for r in results}
-        for r in alt_results:
-            if r['url'] not in existing_urls and len(results) < count:
-                results.append(r)
+    except Exception as e:
+        print(f"❌ Error getting recent videos: {str(e)}")
+        return []
     
     # Save results
     if results:
@@ -315,7 +309,7 @@ def get_recent_videos(channel_url, count=10):
         
         text_file = Path(RESULTS_DIR) / f"recent_{timestamp}.txt"
         with open(text_file, 'w', encoding='utf-8') as f:
-            f.write(f"Recent Videos from: {original_channel}\n")
+            f.write(f"Recent Videos from: {channel_url}\n")
             f.write(f"Requested: {count} videos | Found: {len(results)} videos\n")
             f.write(f"{'='*60}\n\n")
             for i, result in enumerate(results, 1):
@@ -334,19 +328,30 @@ def get_recent_videos(channel_url, count=10):
     
     return results
 
-def download_playlist(playlist_url):
-    """Download entire playlist"""
+def download_playlist(playlist_url, use_proxy=True):
+    """Download entire playlist with proxy support"""
     print(f"\n🎵 Downloading playlist: {playlist_url}")
     
     output_template = f"{DOWNLOAD_DIR}/playlist/%(playlist_title)s/%(title)s_%(id)s.%(ext)s"
     
+    user_agent = get_random_user_agent()
+    
     ydl_opts = {
-        'format': 'best[height<=480]/best',  # Lower quality for playlists
+        'format': 'best[height<=480]/best',
         'outtmpl': output_template,
         'quiet': False,
         'restrictfilenames': True,
-        'ignoreerrors': True,  # Skip failed videos
+        'ignoreerrors': True,
+        'user_agent': user_agent,
+        'sleep_interval': random.uniform(1, 2),
+        'sleep_interval_requests': random.uniform(0.5, 1),
     }
+    
+    if use_proxy:
+        proxy = get_random_proxy()
+        if proxy:
+            ydl_opts['proxy'] = proxy
+            print(f"  Using proxy: {proxy}")
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -357,11 +362,12 @@ def download_playlist(playlist_url):
         print(f"❌ Error downloading playlist: {str(e)}")
         return False
 
-def process_commands():
+def process_commands(use_proxy=True):
     """Process all commands from the commands file"""
     print("🚀 YouTube Video Downloader Started")
     print("="*50)
     print(f"Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Proxy enabled: {use_proxy}")
     print(f"Results directory: {RESULTS_DIR}")
     print(f"Commands file: {COMMANDS_FILE}")
     print("="*50)
@@ -392,22 +398,27 @@ def process_commands():
         print(f"[{idx}/{len(commands)}] Processing command: {cmd_type} {cmd_value}")
         
         if cmd_type == 'search':
-            search_videos(cmd_value)
+            search_videos(cmd_value, use_proxy=use_proxy)
         elif cmd_type == 'download':
-            download_video(cmd_value)
+            download_video_with_proxy(cmd_value, use_proxy=use_proxy)
         elif cmd_type == 'recent':
-            # Check if a number is specified (e.g., "recent 15 @channel")
             parts = cmd_value.split()
             if len(parts) >= 2 and parts[0].isdigit():
                 count = int(parts[0])
                 channel = ' '.join(parts[1:])
-                get_recent_videos(channel, count)
+                get_recent_videos(channel, count, use_proxy=use_proxy)
             else:
-                get_recent_videos(cmd_value, 10)  # Default to 10
+                get_recent_videos(cmd_value, 10, use_proxy=use_proxy)
         elif cmd_type == 'playlist':
-            download_playlist(cmd_value)
+            download_playlist(cmd_value, use_proxy=use_proxy)
         else:
             print(f"⚠️  Unknown command type: {cmd_type}")
+        
+        # Add delay between commands to avoid rate limiting
+        if idx < len(commands):
+            delay = random.uniform(2, 5)
+            print(f"\n⏳ Waiting {delay:.1f} seconds before next command...")
+            time.sleep(delay)
         
         print("-"*50)
     
@@ -420,7 +431,7 @@ def process_commands():
     result_files = list(Path(RESULTS_DIR).glob("*"))
     if result_files:
         print(f"\n📄 Generated files ({len(result_files)}):")
-        for f in result_files[:10]:  # Show first 10 files
+        for f in result_files[:10]:
             size = f.stat().st_size
             if size < 1024:
                 size_str = f"{size} B"
@@ -436,7 +447,8 @@ def process_commands():
 
 def main():
     """Main entry point"""
-    process_commands()
+    # Set use_proxy=False to disable proxy, True to enable
+    process_commands(use_proxy=True)
 
 if __name__ == "__main__":
     main()
