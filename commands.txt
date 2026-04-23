@@ -14,6 +14,3 @@ download https://www.youtube.com/watch?v=dQw4w9WgXcQ
 
 # Get recent videos from a channel (using @handle or full URL)
 recent @mkbhd
-
-# Download a playlist
-playlist https://www.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf
