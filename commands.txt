@@ -6,6 +6,4 @@
 #   recent [channel] - Get recent videos from channel
 #   playlist [url] - Download entire playlist
 
-
-recent bpluspodcast
-download https://youtube.com/watch?v=Yq0QkCxoTHM
+download https://www.youtube.com/watch?v=2VQOAU-aNL0
