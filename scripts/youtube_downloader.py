@@ -166,40 +166,138 @@ def search_videos(query, max_results=10):
         print(f"❌ Error searching: {str(e)}")
         return []
 
+def get_recent_videos_alternative(channel_url, count=10):
+    """Alternative method using search to get recent videos"""
+    results = []
+    
+    try:
+        # Extract channel ID first
+        ydl_opts = {'quiet': True, 'extract_flat': True}
+        
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # Get channel info
+            if not channel_url.startswith('http'):
+                channel_url = f"https://youtube.com/@{channel_url}"
+            
+            info = ydl.extract_info(channel_url, download=False)
+            channel_name = info.get('uploader', info.get('channel', info.get('title', '')))
+            channel_id = info.get('channel_id', info.get('id', ''))
+            
+            if channel_name:
+                # Search for videos from this channel (most recent first)
+                search_query = f"from:{channel_name}"
+                search_url = f"ytsearch{count}:{search_query}"
+                
+                search_info = ydl.extract_info(search_url, download=False)
+                
+                if 'entries' in search_info:
+                    for entry in search_info['entries']:
+                        if entry:
+                            result = {
+                                'title': entry.get('title', 'N/A'),
+                                'url': f"https://youtube.com/watch?v={entry.get('id', '')}",
+                                'video_id': entry.get('id', ''),
+                                'duration': entry.get('duration', 0),
+                                'views': entry.get('view_count', 0),
+                                'upload_date': entry.get('upload_date', 'N/A'),
+                                'uploader': channel_name
+                            }
+                            results.append(result)
+                            
+    except Exception as e:
+        print(f"  Alternative method failed: {str(e)}")
+    
+    return results
+
 def get_recent_videos(channel_url, count=10):
-    """Get recent videos from a channel with anti-detection"""
+    """Get recent videos from a channel"""
     print(f"\n📺 Getting recent videos from: {channel_url}")
     
+    # Different approaches to try
+    approaches = []
+    
+    # Normalize the channel URL
+    original_channel = channel_url
     if not channel_url.startswith('http'):
+        # Remove @ symbol if present for building URLs
         clean_channel = channel_url.replace('@', '')
-        channel_url = f"https://www.youtube.com/@{clean_channel}"
+        approaches = [
+            f"https://www.youtube.com/@{clean_channel}/videos",
+            f"https://www.youtube.com/c/{clean_channel}/videos",
+            f"https://www.youtube.com/channel/{clean_channel}/videos",
+            f"https://www.youtube.com/@{clean_channel}",
+            f"https://www.youtube.com/{clean_channel}/videos",
+        ]
+    else:
+        # If it's already a URL, make sure it points to videos tab
+        if '/videos' not in channel_url:
+            channel_url = channel_url.rstrip('/') + '/videos'
+        approaches = [channel_url]
     
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
-        'ignoreerrors': True,
-        'extract_flat': 'in_playlist',
-        'user_agent': get_random_user_agent(),
-        'sleep_interval': random.uniform(1, 3),
+        'ignoreerrors': True,  # Skip any problematic entries
+        'extract_flat': 'in_playlist',  # More efficient for playlists
     }
     
     results = []
     
-    try:
-        time.sleep(random.uniform(1, 2))
-        
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(channel_url, download=False)
+    for url in approaches:
+        if results and len(results) >= count:  # If we already got enough results, stop trying
+            break
             
-            if 'entries' in info:
-                for entry in info['entries']:
-                    if entry is None or len(results) >= count:
+        print(f"  Trying: {url}")
+        
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+                
+                # Handle different response structures
+                entries = []
+                if 'entries' in info:
+                    entries = info['entries']
+                elif 'videos' in info:
+                    entries = info['videos']
+                else:
+                    # Try to get uploads playlist ID
+                    uploads_id = None
+                    if 'uploader_id' in info:
+                        uploads_id = info.get('uploader_id')
+                    elif 'channel_id' in info:
+                        uploads_id = info.get('channel_id')
+                    
+                    if uploads_id:
+                        # Get uploads playlist
+                        uploads_playlist = f"https://www.youtube.com/channel/{uploads_id}/videos"
+                        info2 = ydl.extract_info(uploads_playlist, download=False)
+                        if 'entries' in info2:
+                            entries = info2['entries']
+                
+                # Extract video information
+                for entry in entries:
+                    if entry is None:
+                        continue
+                        
+                    if len(results) >= count:
                         break
                     
+                    # Handle different ID formats
                     video_id = entry.get('id', '')
+                    if video_id and '/' in video_id:
+                        video_id = video_id.split('/')[-1]
+                    
+                    # Get video URL
+                    if 'url' in entry and entry['url']:
+                        video_url = entry['url']
+                    elif video_id:
+                        video_url = f"https://youtube.com/watch?v={video_id}"
+                    else:
+                        continue
+                    
                     result = {
                         'title': entry.get('title', 'N/A'),
-                        'url': f"https://youtube.com/watch?v={video_id}",
+                        'url': video_url,
                         'video_id': video_id,
                         'duration': entry.get('duration', 0),
                         'views': entry.get('view_count', 0),
@@ -207,36 +305,49 @@ def get_recent_videos(channel_url, count=10):
                         'uploader': info.get('uploader', entry.get('uploader', 'N/A'))
                     }
                     results.append(result)
+                    
+        except Exception as e:
+            print(f"  Failed with error: {str(e)}")
+            continue
+    
+    # If we still don't have enough videos, try alternative extraction method
+    if len(results) < count:
+        print(f"  Only got {len(results)} videos, trying alternative method...")
+        alt_results = get_recent_videos_alternative(original_channel, count)
+        # Merge results without duplicates
+        existing_urls = {r['url'] for r in results}
+        for r in alt_results:
+            if r['url'] not in existing_urls and len(results) < count:
+                results.append(r)
+    
+    # Save results
+    if results:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_file = Path(RESULTS_DIR) / f"recent_{timestamp}.json"
         
-        # Save results
-        if results:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_file = Path(RESULTS_DIR) / f"recent_{timestamp}.json"
-            
-            with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump(results, f, indent=2, ensure_ascii=False)
-            
-            text_file = Path(RESULTS_DIR) / f"recent_{timestamp}.txt"
-            with open(text_file, 'w', encoding='utf-8') as f:
-                f.write(f"Recent Videos from: {channel_url}\n")
-                f.write(f"Found: {len(results)} videos\n")
-                f.write(f"{'='*60}\n\n")
-                for i, result in enumerate(results, 1):
-                    f.write(f"{i}. {result['title']}\n")
-                    f.write(f"   URL: {result['url']}\n")
-                    f.write(f"   Upload Date: {result['upload_date']}\n")
-                    f.write(f"   Duration: {result['duration']} seconds\n\n")
-            
-            print(f"✅ Found {len(results)} recent videos")
-        else:
-            print(f"❌ No videos found")
+        with open(output_file, 'w', encoding='utf-8') as f:
+            json.dump(results, f, indent=2, ensure_ascii=False)
         
-        return results
+        text_file = Path(RESULTS_DIR) / f"recent_{timestamp}.txt"
+        with open(text_file, 'w', encoding='utf-8') as f:
+            f.write(f"Recent Videos from: {original_channel}\n")
+            f.write(f"Requested: {count} videos | Found: {len(results)} videos\n")
+            f.write(f"{'='*60}\n\n")
+            for i, result in enumerate(results, 1):
+                f.write(f"{i}. {result['title']}\n")
+                f.write(f"   URL: {result['url']}\n")
+                f.write(f"   Video ID: {result['video_id']}\n")
+                f.write(f"   Upload Date: {result['upload_date']}\n")
+                f.write(f"   Duration: {result['duration']} seconds\n")
+                if result['views']:
+                    f.write(f"   Views: {result['views']:,}\n")
+                f.write(f"\n")
         
-    except Exception as e:
-        print(f"❌ Error getting recent videos: {str(e)}")
-        return []
-
+        print(f"✅ Found {len(results)} recent videos (requested {count})")
+    else:
+        print(f"❌ No videos found")
+    
+    return results
 def download_playlist(playlist_url):
     """Download entire playlist with anti-detection"""
     print(f"\n🎵 Downloading playlist: {playlist_url}")
