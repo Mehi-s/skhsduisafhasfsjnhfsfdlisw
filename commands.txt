@@ -6,11 +6,4 @@
 #   recent [channel] - Get recent videos from channel
 #   playlist [url] - Download entire playlist
 
-# Search for AI tutorials
-search ai programming tutorial 2024
-
-# Download a specific video
-download https://www.youtube.com/watch?v=dQw4w9WgXcQ
-
-# Get recent videos from a channel (using @handle or full URL)
 recent @mkbhd
