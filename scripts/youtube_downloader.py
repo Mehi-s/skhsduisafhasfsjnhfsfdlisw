@@ -117,7 +117,7 @@ def download_video(url, output_template=None):
         output_template = f"{DOWNLOAD_DIR}/%(title)s_%(id)s.%(ext)s"
     
     ydl_opts = {
-        'format': 'best[height<=720]/best',  # Limit to 720p to save space
+        'format': 'worst[height>=360]',  # Limit to 720p to save space
         'outtmpl': output_template,
         'quiet': False,
         'no_warnings': False,
