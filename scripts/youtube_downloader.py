@@ -37,106 +37,150 @@ def setup_directories():
 def get_random_user_agent():
     """Get a random user agent to avoid detection"""
     return random.choice(USER_AGENTS)
+
 def download_video_with_proxy(url, output_template=None):
     """
-    Download a video using yt-dlp-proxy to avoid bot detection
-    Uses the yt-dlp-proxy CLI command with proxy support
+    Download a video using alternative YouTube frontends to avoid bot detection
+    No cookies or proxies required
     """
     print(f"\n📥 Downloading: {url}")
     
     if output_template is None:
-        # Create a safe filename from video title or use ID
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_template = f"{DOWNLOAD_DIR}/%(title)s_%(id)s_%(ext)s"
+        output_template = f"{DOWNLOAD_DIR}/%(title)s_%(id)s.%(ext)s"
     
-    # Extract video ID for display
+    # Extract video ID from various YouTube URL formats
     video_id = None
+    
+    # Pattern for youtube.com/watch?v=XXXXX
     if 'youtube.com/watch' in url:
         match = re.search(r'[?&]v=([^&]+)', url)
         if match:
             video_id = match.group(1)
+    
+    # Pattern for youtu.be/XXXXX
     elif 'youtu.be/' in url:
         video_id = url.split('youtu.be/')[-1].split('?')[0]
     
-    if video_id:
-        print(f"  Video ID: {video_id}")
+    # Pattern for youtube.com/embed/XXXXX
+    elif 'youtube.com/embed/' in url:
+        video_id = url.split('youtube.com/embed/')[-1].split('?')[0]
     
-    # Build the yt-dlp-proxy command
-    # Format: bv[vcodec^=avc!]+ba for best video with avc codec + best audio
-    # Using worst quality but ensuring at least 360p
-    cmd = [
-        'yt-dlp-proxy',
-        '--format', 'worst[height>=360]/best[height<=480]/worst',
-        '--output', output_template,
-        '--no-mtime',  # Don't use Last-modified header to set file modification time
-        '--retries', '10',
-        '--fragment-retries', '10',
-        '--sleep-interval', '3',
-        '--max-sleep-interval', '8',
-        url
+    # Pattern for youtube.com/shorts/XXXXX
+    elif 'youtube.com/shorts/' in url:
+        video_id = url.split('youtube.com/shorts/')[-1].split('?')[0]
+    
+    if not video_id:
+        print(f"❌ Could not extract video ID from URL: {url}")
+        return False
+    
+    print(f"  Video ID: {video_id}")
+    
+    # List of alternative YouTube frontends (Invidious instances)
+    # These are privacy-focused frontends that don't have bot detection
+    frontends = [
+        f"https://yewtu.be/watch?v={video_id}",
+        f"https://inv.riverside.rocks/watch?v={video_id}",
+        f"https://invidious.slipfox.xyz/watch?v={video_id}",
+        f"https://inv.vern.cc/watch?v={video_id}",
+        f"https://invidious.privacydev.net/watch?v={video_id}",
+        f"https://inv.odyssey346.dev/watch?v={video_id}",
+        f"https://invidious.flokinet.to/watch?v={video_id}",
+        f"https://vid.puffyan.us/watch?v={video_id}",
+        f"https://invidious.nerdvpn.de/watch?v={video_id}",
+        f"https://inv.bp.projectsegfau.lt/watch?v={video_id}",
     ]
     
-    try:
-        print(f"  Running yt-dlp-proxy with anti-detection...")
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    # Shuffle frontends to distribute load
+    random.shuffle(frontends)
+    
+    # Standard yt-dlp options for low quality (minimum 360p)
+    ydl_opts = {
+        'format': 'best[height>=360][height<=480]/best[height<=480]/worst[height>=360]',
+        'outtmpl': output_template,
+        'quiet': False,
+        'no_warnings': False,
+        'restrictfilenames': True,
+        'retries': 5,
+        'fragment_retries': 5,
+        'sleep_interval': random.uniform(2, 5),
+    }
+    
+    # Try each frontend until one works
+    for i, frontend_url in enumerate(frontends, 1):
+        print(f"  Attempt {i}/{len(frontends)}: Trying {frontend_url.split('/')[2]}...")
         
-        if result.returncode == 0:
-            print(f"✅ Download successful via yt-dlp-proxy")
+        try:
+            # Add delay between attempts to avoid rate limiting
+            if i > 1:
+                time.sleep(random.uniform(3, 7))
             
-            # Try to find the downloaded file and save metadata
-            downloaded_files = list(Path(DOWNLOAD_DIR).glob(f"*{video_id}*")) if video_id else []
-            downloaded_files.extend(list(Path(DOWNLOAD_DIR).glob("*.mp4")))
-            downloaded_files.extend(list(Path(DOWNLOAD_DIR).glob("*.webm")))
-            
-            if downloaded_files:
-                latest_file = max(downloaded_files, key=lambda x: x.stat().st_mtime)
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(frontend_url, download=True)
+                
+                # Get the actual downloaded filename
+                filename = ydl.prepare_filename(info)
+                
+                # Save metadata
                 metadata = {
-                    'title': latest_file.stem,
-                    'url': url,
-                    'video_id': video_id if video_id else 'unknown',
-                    'filename': str(latest_file),
-                    'filesize': latest_file.stat().st_size,
-                    'download_method': 'yt-dlp-proxy',
-                    'download_time': datetime.now().isoformat()
+                    'title': info.get('title', 'N/A'),
+                    'original_url': url,
+                    'video_id': video_id,
+                    'frontend_used': frontend_url,
+                    'duration': info.get('duration', 0),
+                    'upload_date': info.get('upload_date', 'N/A'),
+                    'views': info.get('view_count', 0),
+                    'filename': filename,
+                    'format': info.get('format', 'N/A'),
+                    'height': info.get('height', 0)
                 }
                 
                 metadata_file = Path(RESULTS_DIR) / f"download_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
                 with open(metadata_file, 'w', encoding='utf-8') as f:
                     json.dump(metadata, f, indent=2, ensure_ascii=False)
-            
+                
+                print(f"✅ Downloaded: {info.get('title')} (Quality: {info.get('height', 'Unknown')}p)")
+                print(f"   Used frontend: {frontend_url.split('/')[2]}")
+                return True
+                
+        except Exception as e:
+            error_msg = str(e)
+            if "404" in error_msg or "Not Found" in error_msg:
+                print(f"  ✗ Frontend returned 404 (video may be unavailable)")
+            elif "timed out" in error_msg.lower():
+                print(f"  ✗ Frontend timeout - trying next")
+            else:
+                print(f"  ✗ Failed: {error_msg[:100]}")
+            continue
+    
+    # If all frontends fail, try one more time with direct YouTube URL as fallback
+    print(f"\n  All frontends failed, trying direct YouTube URL as fallback...")
+    try:
+        fallback_opts = {
+            'format': 'worst[height>=360]/best[height<=360]',
+            'outtmpl': output_template,
+            'quiet': False,
+            'no_warnings': False,
+            'restrictfilenames': True,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web'],
+                }
+            },
+            'user_agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36',
+            'sleep_interval': random.uniform(3, 6),
+        }
+        
+        with yt_dlp.YoutubeDL(fallback_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            print(f"✅ Downloaded (direct): {info.get('title')}")
             return True
-        else:
-            error_msg = result.stderr
-            print(f"❌ yt-dlp-proxy error: {error_msg[:200]}")
-            
-            if "Sign in to confirm" in error_msg:
-                print(f"  Bot detection still active - trying with different format...")
-                # Try with the exact format you specified
-                cmd2 = [
-                    'yt-dlp-proxy',
-                    '--format', 'bv[vcodec^=avc!]+ba',
-                    '--output', output_template,
-                    url
-                ]
-                result2 = subprocess.run(cmd2, capture_output=True, text=True, timeout=600)
-                if result2.returncode == 0:
-                    print(f"✅ Download successful with format: bv[vcodec^=avc!]+ba")
-                    return True
-                else:
-                    print(f"❌ Second attempt also failed")
-            
-            return False
-            
-    except subprocess.TimeoutExpired:
-        print(f"❌ Download timed out after 10 minutes")
-        return False
-    except FileNotFoundError:
-        print(f"❌ yt-dlp-proxy not found. Please install it first.")
-        print(f"   Run: pip install yt-dlp-proxy")
-        return False
     except Exception as e:
-        print(f"❌ Error: {str(e)}")
-        return Falsedef search_videos(query, max_results=10):
+        print(f"❌ Fallback also failed: {str(e)}")
+    
+    print(f"❌ Failed to download video {video_id} from all sources")
+    return False
+
+def search_videos(query, max_results=10):
     """Search YouTube for videos with anti-detection"""
     print(f"\n🔍 Searching for: {query}")
     
