@@ -5,7 +5,6 @@
 #   download [url] - Download video
 #   recent [channel] - Get recent videos from channel
 #   playlist [url] - Download entire playlist
-
-
+  
 
 download https://www.youtube.com/watch?v=2VQOAU-aNL0
