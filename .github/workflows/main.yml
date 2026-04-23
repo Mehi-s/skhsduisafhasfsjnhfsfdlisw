@@ -1,19 +1,14 @@
-name: YouTube Video Downloader
+name: YouTube Downloader
 
 on:
-  push:
-    branches: [ main, master ]
-    paths:
-      - 'commands.txt'
-  schedule:
-    # Run daily at 2 AM UTC to avoid peak hours
-    - cron: '0 2 * * *'
   workflow_dispatch:
     inputs:
-      command:
-        description: 'Command to run (search, download, recent, playlist)'
+      custom_command:
+        description: 'Command to run'
         required: false
         type: string
+  schedule:
+    - cron: '0 2 * * *'
 
 permissions:
   contents: write
@@ -21,6 +16,7 @@ permissions:
 jobs:
   download:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     
     steps:
     - name: Checkout repository
@@ -33,25 +29,34 @@ jobs:
         
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        # Verify installation
-        yt-dlp-proxy --version || echo "yt-dlp-proxy installed"
+        pip install yt-dlp
+        sudo apt-get update -qq
+        sudo apt-get install -y ffmpeg
         
-    - name: Create results directory
-      run: mkdir -p results downloads
+    - name: Handle custom command
+      if: github.event.inputs.custom_command != ''
+      run: |
+        echo "${{ github.event.inputs.custom_command }}" >> commands.txt
+        
+    - name: Create directories
+      run: |
+        mkdir -p results
+        mkdir -p results/downloads
         
     - name: Run YouTube Downloader
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        YOUTUBE_COOKIES: ${{ secrets.YOUTUBE_COOKIES }}
+        PYTHONUNBUFFERED: 1
+      run: python scripts/youtube_downloader.py
+      
+    - name: Commit results
       run: |
-        cd scripts
-        python youtube_downloader.py
-        
-    - name: Commit and push results
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add results/ downloads/ commands.txt
-        git diff --staged --quiet || git commit -m "Update YouTube downloader results [skip ci]"
-        git push
+        git config --local user.email "actions@github.com"
+        git config --local user.name "GitHub Actions"
+        git add results/ commands.txt
+        if git diff --staged --quiet; then
+          echo "No changes"
+        else
+          git commit -m "📺 Update results [skip ci]"
+          git push
+        fi
