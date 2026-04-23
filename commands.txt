@@ -6,4 +6,4 @@
 #   recent [channel] - Get recent videos from channel
 #   playlist [url] - Download entire playlist
 
-recent Bplus Podcast
+recent Bplus_Podcast
