@@ -37,77 +37,84 @@ def setup_directories():
 def get_random_user_agent():
     """Get a random user agent to avoid detection"""
     return random.choice(USER_AGENTS)
-
 def download_video_with_proxy(url, output_template=None):
     """
-    Download a video using yt-dlp with proxy-like behavior
-    Uses rotating user agents and other anti-detection measures
+    Download a video using yt-dlp with multiple anti-detection measures
+    No cookies required - uses alternative clients and tokens
     """
     print(f"\n📥 Downloading: {url}")
     
     if output_template is None:
         output_template = f"{DOWNLOAD_DIR}/%(title)s_%(id)s.%(ext)s"
     
-    # Anti-detection options
+    # Advanced anti-detection options for GitHub Actions
     ydl_opts = {
-        'format': 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360]/best',  # Lowest quality >=360p
+        'format': 'worst[height>=360]/best[height<=360]/best',
         'outtmpl': output_template,
         'quiet': False,
         'no_warnings': False,
         'restrictfilenames': True,
-        'user_agent': get_random_user_agent(),
-        'referer': 'https://www.google.com/',
-        'add_header': [
-            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language: en-us,en;q=0.5',
-            'Accept-Encoding: gzip, deflate',
-            'Connection: keep-alive',
-        ],
+        
+        # Use multiple clients to avoid bot detection
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'web'],  # Use mobile client when possible
-                'skip': ['hls', 'dash'],
+                'player_client': ['android', 'web', 'ios'],  # Try multiple clients
+                'skip': ['hls', 'dash'],  # Skip problematic formats
+                'player_skip': ['configs'],  # Skip configs that might trigger bot detection
             }
         },
-        'throttledratelimit': 1000000,  # 1 MB/s limit to avoid triggering rate limits
-        'retries': 10,
-        'fragment_retries': 10,
-        'sleep_interval': random.uniform(3, 7),  # Random sleep between requests
-        'sleep_interval_requests': random.uniform(1, 3),
+        
+        # Randomize request patterns
+        'sleep_interval': random.uniform(5, 10),  # Longer delays
+        'sleep_interval_requests': random.uniform(3, 7),
+        'throttledratelimit': 500000,  # 500 KB/s limit
+        
+        # Use mobile user agents
+        'user_agent': random.choice([
+            'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.6045.163 Mobile Safari/537.36',
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1',
+        ]),
+        
+        # Add headers to look like a real mobile app
+        'add_header': [
+            'Accept: */*',
+            'Accept-Language: en-US,en;q=0.9',
+            'Origin: https://www.youtube.com',
+            'Referer: https://www.youtube.com',
+        ],
+        
+        # Retry configuration
+        'retries': 15,
+        'fragment_retries': 15,
+        'skip_unavailable_fragments': True,
+        
+        # Use innertube API with visitor data
+        'innertube_host': 'www.youtube.com',
+        'innertube_key': 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8',  # Public API key
     }
     
     try:
-        # Add a small delay before downloading
-        time.sleep(random.uniform(2, 5))
+        # Add longer delay before starting
+        time.sleep(random.uniform(5, 15))
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
             
-            # Save metadata
-            metadata = {
-                'title': info.get('title', 'N/A'),
-                'url': url,
-                'duration': info.get('duration', 0),
-                'upload_date': info.get('upload_date', 'N/A'),
-                'views': info.get('view_count', 0),
-                'likes': info.get('like_count', 0),
-                'filename': filename,
-                'format': info.get('format', 'N/A'),
-                'height': info.get('height', 0)
-            }
-            
-            metadata_file = Path(RESULTS_DIR) / f"download_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-            with open(metadata_file, 'w', encoding='utf-8') as f:
-                json.dump(metadata, f, indent=2, ensure_ascii=False)
-            
-            print(f"✅ Downloaded: {info.get('title')} (Quality: {info.get('height', 'Unknown')}p)")
+            print(f"✅ Downloaded: {info.get('title')}")
             return True
             
     except Exception as e:
-        print(f"❌ Error downloading: {str(e)}")
+        error_msg = str(e)
+        if "Sign in to confirm you're not a bot" in error_msg:
+            print(f"❌ Bot detection triggered. Try these solutions:")
+            print(f"   1. Use your own cookies (see below)")
+            print(f"   2. Run at a different time of day")
+            print(f"   3. Reduce download frequency")
+            print(f"   4. Use a different GitHub account (different IP)")
+        else:
+            print(f"❌ Error downloading: {error_msg}")
         return False
-
 def search_videos(query, max_results=10):
     """Search YouTube for videos with anti-detection"""
     print(f"\n🔍 Searching for: {query}")
