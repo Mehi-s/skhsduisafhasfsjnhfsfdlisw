@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-YouTube Video Downloader using yt-dlp with proxy support
-Processes commands from commands.txt file
+YouTube Video Downloader - GitHub Actions Optimized
+Uses multiple strategies to avoid bot detection without cookies
 """
 
 import yt_dlp
@@ -11,6 +11,7 @@ import json
 import subprocess
 import random
 import time
+import base64
 from pathlib import Path
 from datetime import datetime
 
@@ -19,14 +20,18 @@ COMMANDS_FILE = "../commands.txt"
 RESULTS_DIR = "../results"
 DOWNLOAD_DIR = "../results/downloads"
 
-# Proxy configuration - using public proxies or your own
-# For GitHub Actions, we'll use rotating user agents instead of proxies
+# Rotating user agents with mobile emphasis (less likely to be flagged)
 USER_AGENTS = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/119.0',
-    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:109.0) Gecko/20100101 Firefox/119.0',
+    # Android Chrome
+    'Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.144 Mobile Safari/537.36',
+    'Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.6167.160 Mobile Safari/537.36',
+    'Mozilla/5.0 (Linux; Android 13; OnePlus 11) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.210 Mobile Safari/537.36',
+    # iOS Safari
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1',
+    'Mozilla/5.0 (iPad; CPU OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1',
+    # Desktop (less frequent)
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
 ]
 
 def setup_directories():
@@ -37,111 +42,148 @@ def setup_directories():
 def get_random_user_agent():
     """Get a random user agent to avoid detection"""
     return random.choice(USER_AGENTS)
-def download_video_with_proxy(url, output_template=None):
+
+def get_visitor_data():
+    """Generate visitor data for YouTube API requests"""
+    # This mimics a fresh visitor session
+    timestamp = int(time.time() * 1000)
+    random_id = ''.join(random.choices('0123456789abcdef', k=11))
+    return base64.b64encode(f"{timestamp}{random_id}".encode()).decode()[:11]
+
+def download_with_ytdlp(url, quality='worst'):
     """
-    Download a video using yt-dlp-proxy to avoid bot detection
-    Uses the yt-dlp-proxy CLI command with proxy support
+    Download using yt-dlp with enhanced anti-detection
     """
     print(f"\n📥 Downloading: {url}")
     
-    if output_template is None:
-        # Create a safe filename from video title or use ID
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_template = f"{DOWNLOAD_DIR}/%(title)s_%(id)s_%(ext)s"
+    # Define output template
+    output_template = f"{DOWNLOAD_DIR}/%(title).100s_%(id)s.%(ext)s"
     
-    # Extract video ID for display
-    video_id = None
-    if 'youtube.com/watch' in url:
-        match = re.search(r'[?&]v=([^&]+)', url)
-        if match:
-            video_id = match.group(1)
-    elif 'youtu.be/' in url:
-        video_id = url.split('youtu.be/')[-1].split('?')[0]
+    # Strategy: Use multiple client types and extractors
+    ydl_opts = {
+        'format': 'worstvideo+worstaudio/worst[height>=144]',
+        'outtmpl': output_template,
+        'quiet': False,
+        'no_warnings': False,
+        'restrictfilenames': True,
+        'windowsfilenames': True,
+        
+        # Key anti-detection settings
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'ios', 'web_embedded', 'web'],
+                'skip': ['hls', 'dash', 'translated_subs'],
+                'player_skip': ['configs', 'webpage', 'js'],
+            }
+        },
+        
+        # Throttling to avoid detection
+        'throttledratelimit': 100000,  # 100KB/s
+        'sleep_interval': random.uniform(3, 8),
+        'sleep_interval_requests': random.uniform(2, 5),
+        'max_sleep_interval': 15,
+        
+        # Randomize request headers
+        'user_agent': get_random_user_agent(),
+        'http_headers': {
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': random.choice(['en-US,en;q=0.9', 'en-GB,en;q=0.8', 'fr-FR,fr;q=0.9']),
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+        },
+        
+        # Retry configuration
+        'retries': 20,
+        'fragment_retries': 20,
+        'retry_sleep_functions': {'http': lambda n: random.uniform(5, 15)},
+        'skip_unavailable_fragments': True,
+        'ignoreerrors': True,
+        
+        # Use latest APIs
+        'geo_bypass': True,
+        'geo_bypass_country': random.choice(['US', 'GB', 'CA', 'AU', 'DE']),
+        
+        # Force IPv4 (sometimes helps)
+        'force_ipv4': True,
+    }
     
-    if video_id:
-        print(f"  Video ID: {video_id}")
+    # Try with yt-dlp
+    max_attempts = 3
+    for attempt in range(max_attempts):
+        try:
+            print(f"  Attempt {attempt + 1}/{max_attempts}...")
+            time.sleep(random.uniform(5, 10))
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                
+                if info:
+                    title = info.get('title', 'Unknown')
+                    duration = info.get('duration', 0)
+                    print(f"✅ Downloaded: {title} ({duration}s)")
+                    return True
+                    
+        except Exception as e:
+            error_msg = str(e)
+            if "bot" in error_msg.lower() or "sign in" in error_msg.lower():
+                print(f"  ⚠️ Bot detection (attempt {attempt + 1})")
+                if attempt < max_attempts - 1:
+                    # Change strategy for next attempt
+                    ydl_opts['extractor_args']['youtube']['player_client'] = ['android_vr', 'ios', 'tv']
+                    ydl_opts['user_agent'] = 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36'
+                    wait_time = (attempt + 1) * 30
+                    print(f"  ⏳ Waiting {wait_time}s before retry...")
+                    time.sleep(wait_time)
+            else:
+                print(f"❌ Error: {error_msg}")
+                break
     
-    # Build the yt-dlp-proxy command
-    # Format: bv[vcodec^=avc!]+ba for best video with avc codec + best audio
-    # Using worst quality but ensuring at least 360p
+    return False
+
+def download_with_yt_dlp_python(url):
+    """
+    Alternative: Use yt-dlp as subprocess (sometimes bypasses detection)
+    """
+    print(f"\n🔄 Trying alternative download method...")
+    
+    output_template = str(Path(DOWNLOAD_DIR) / "%(title).100s_%(id)s.%(ext)s")
+    
     cmd = [
-        'yt-dlp-proxy',
-        '--format', 'worst[height>=360]/best[height<=480]/worst',
-        '--output', output_template,
-        '--no-mtime',  # Don't use Last-modified header to set file modification time
+        'yt-dlp',
+        url,
+        '-f', 'worst[height>=144]',
+        '-o', output_template,
+        '--restrict-filenames',
+        '--no-warnings',
+        '--user-agent', get_random_user_agent(),
+        '--extractor-args', 'youtube:player_client=android,ios',
+        '--sleep-interval', str(random.randint(3, 7)),
+        '--max-sleep-interval', '15',
         '--retries', '10',
         '--fragment-retries', '10',
-        '--sleep-interval', '3',
-        '--max-sleep-interval', '8',
-        url
+        '--throttled-rate', '100K',
+        '--geo-bypass',
+        '--force-ipv4',
+        '--no-check-certificates',  # Sometimes helps
     ]
     
     try:
-        print(f"  Running yt-dlp-proxy with anti-detection...")
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-        
         if result.returncode == 0:
-            print(f"✅ Download successful via yt-dlp-proxy")
-            
-            # Try to find the downloaded file and save metadata
-            downloaded_files = list(Path(DOWNLOAD_DIR).glob(f"*{video_id}*")) if video_id else []
-            downloaded_files.extend(list(Path(DOWNLOAD_DIR).glob("*.mp4")))
-            downloaded_files.extend(list(Path(DOWNLOAD_DIR).glob("*.webm")))
-            
-            if downloaded_files:
-                latest_file = max(downloaded_files, key=lambda x: x.stat().st_mtime)
-                metadata = {
-                    'title': latest_file.stem,
-                    'url': url,
-                    'video_id': video_id if video_id else 'unknown',
-                    'filename': str(latest_file),
-                    'filesize': latest_file.stat().st_size,
-                    'download_method': 'yt-dlp-proxy',
-                    'download_time': datetime.now().isoformat()
-                }
-                
-                metadata_file = Path(RESULTS_DIR) / f"download_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-                with open(metadata_file, 'w', encoding='utf-8') as f:
-                    json.dump(metadata, f, indent=2, ensure_ascii=False)
-            
+            print("✅ Downloaded successfully with alternative method")
             return True
         else:
-            error_msg = result.stderr
-            print(f"❌ yt-dlp-proxy error: {error_msg[:200]}")
-            
-            if "Sign in to confirm" in error_msg:
-                print(f"  Bot detection still active - trying with different format...")
-                # Try with the exact format you specified
-                cmd2 = [
-                    'yt-dlp-proxy',
-                    '--format', 'bv[vcodec^=avc!]+ba',
-                    '--output', output_template,
-                    url
-                ]
-                result2 = subprocess.run(cmd2, capture_output=True, text=True, timeout=600)
-                if result2.returncode == 0:
-                    print(f"✅ Download successful with format: bv[vcodec^=avc!]+ba")
-                    return True
-                else:
-                    print(f"❌ Second attempt also failed")
-            
+            print(f"❌ Failed: {result.stderr[:200]}")
             return False
-            
-    except subprocess.TimeoutExpired:
-        print(f"❌ Download timed out after 10 minutes")
-        return False
-    except FileNotFoundError:
-        print(f"❌ yt-dlp-proxy not found. Please install it first.")
-        print(f"   Run: pip install yt-dlp-proxy")
-        return False
     except Exception as e:
-        print(f"❌ Error: {str(e)}")
+        print(f"❌ Error with subprocess method: {str(e)}")
         return False
-
 
 def search_videos(query, max_results=10):
-    """Search YouTube for videos with anti-detection"""
-    print(f"\n🔍 Searching for: {query}")
+    """Search YouTube with anti-detection"""
+    print(f"\n🔍 Searching: {query}")
     
     ydl_opts = {
         'quiet': True,
@@ -149,377 +191,246 @@ def search_videos(query, max_results=10):
         'extract_flat': True,
         'force_generic_extractor': False,
         'user_agent': get_random_user_agent(),
-        'sleep_interval': random.uniform(1, 3),
+        'sleep_interval': random.uniform(2, 4),
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android'],
+                'skip': ['webpage'],
+            }
+        },
     }
     
     results = []
     try:
-        time.sleep(random.uniform(1, 2))
+        time.sleep(random.uniform(2, 5))
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             search_query = f"ytsearch{max_results}:{query}"
             info = ydl.extract_info(search_query, download=False)
             
-            if 'entries' in info:
+            if info and 'entries' in info:
                 for entry in info['entries']:
-                    result = {
-                        'title': entry.get('title', 'N/A'),
-                        'url': f"https://youtube.com/watch?v={entry.get('id', '')}",
-                        'duration': entry.get('duration', 0),
-                        'views': entry.get('view_count', 0),
-                        'uploader': entry.get('uploader', 'N/A')
-                    }
-                    results.append(result)
-                    
-        # Save search results to JSON
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = Path(RESULTS_DIR) / f"search_{timestamp}.json"
+                    if entry:
+                        results.append({
+                            'title': entry.get('title', 'N/A'),
+                            'url': f"https://youtube.com/watch?v={entry.get('id', '')}",
+                            'duration': entry.get('duration', 0),
+                            'views': entry.get('view_count', 0),
+                            'uploader': entry.get('uploader', 'N/A'),
+                            'channel_id': entry.get('channel_id', '')
+                        })
         
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(results, f, indent=2, ensure_ascii=False)
+        # Save results
+        if results:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_file = Path(RESULTS_DIR) / f"search_{timestamp}.json"
+            
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(results, f, indent=2, ensure_ascii=False)
+            
+            # Text summary
+            text_file = Path(RESULTS_DIR) / f"search_{timestamp}.txt"
+            with open(text_file, 'w', encoding='utf-8') as f:
+                f.write(f"Search: {query}\n{'='*50}\n\n")
+                for i, r in enumerate(results, 1):
+                    f.write(f"{i}. {r['title']}\n")
+                    f.write(f"   URL: {r['url']}\n")
+                    f.write(f"   Channel: {r['uploader']}\n\n")
+            
+            print(f"✅ Found {len(results)} results")
+        else:
+            print("❌ No results found")
         
-        # Also create a readable text file
-        text_file = Path(RESULTS_DIR) / f"search_{timestamp}.txt"
-        with open(text_file, 'w', encoding='utf-8') as f:
-            f.write(f"Search Results for: {query}\n")
-            f.write(f"{'='*60}\n\n")
-            for i, result in enumerate(results, 1):
-                f.write(f"{i}. {result['title']}\n")
-                f.write(f"   URL: {result['url']}\n")
-                f.write(f"   Channel: {result['uploader']}\n")
-                f.write(f"   Duration: {result['duration']} seconds\n")
-                f.write(f"   Views: {result['views']:,}\n\n")
-        
-        print(f"✅ Search results saved to: {output_file} and {text_file}")
         return results
         
     except Exception as e:
-        print(f"❌ Error searching: {str(e)}")
+        print(f"❌ Search failed: {str(e)}")
         return []
 
-def get_recent_videos_alternative(channel_url, count=10):
-    """Alternative method using search to get recent videos"""
-    results = []
+def get_channel_videos(channel, count=10):
+    """Get recent videos from channel"""
+    print(f"\n📺 Channel: {channel}")
     
-    try:
-        # Extract channel ID first
-        ydl_opts = {'quiet': True, 'extract_flat': True}
-        
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Get channel info
-            if not channel_url.startswith('http'):
-                channel_url = f"https://youtube.com/@{channel_url}"
-            
-            info = ydl.extract_info(channel_url, download=False)
-            channel_name = info.get('uploader', info.get('channel', info.get('title', '')))
-            channel_id = info.get('channel_id', info.get('id', ''))
-            
-            if channel_name:
-                # Search for videos from this channel (most recent first)
-                search_query = f"from:{channel_name}"
-                search_url = f"ytsearch{count}:{search_query}"
-                
-                search_info = ydl.extract_info(search_url, download=False)
-                
-                if 'entries' in search_info:
-                    for entry in search_info['entries']:
-                        if entry:
-                            result = {
-                                'title': entry.get('title', 'N/A'),
-                                'url': f"https://youtube.com/watch?v={entry.get('id', '')}",
-                                'video_id': entry.get('id', ''),
-                                'duration': entry.get('duration', 0),
-                                'views': entry.get('view_count', 0),
-                                'upload_date': entry.get('upload_date', 'N/A'),
-                                'uploader': channel_name
-                            }
-                            results.append(result)
-                            
-    except Exception as e:
-        print(f"  Alternative method failed: {str(e)}")
-    
-    return results
-
-def get_recent_videos(channel_url, count=10):
-    """Get recent videos from a channel"""
-    print(f"\n📺 Getting recent videos from: {channel_url}")
-    
-    # Different approaches to try
-    approaches = []
-    
-    # Normalize the channel URL
-    original_channel = channel_url
-    if not channel_url.startswith('http'):
-        # Remove @ symbol if present for building URLs
-        clean_channel = channel_url.replace('@', '')
-        approaches = [
-            f"https://www.youtube.com/@{clean_channel}/videos",
-            f"https://www.youtube.com/c/{clean_channel}/videos",
-            f"https://www.youtube.com/channel/{clean_channel}/videos",
-            f"https://www.youtube.com/@{clean_channel}",
-            f"https://www.youtube.com/{clean_channel}/videos",
-        ]
-    else:
-        # If it's already a URL, make sure it points to videos tab
-        if '/videos' not in channel_url:
-            channel_url = channel_url.rstrip('/') + '/videos'
-        approaches = [channel_url]
+    # Normalize channel input
+    if not channel.startswith('http'):
+        if not channel.startswith('@'):
+            channel = f"@{channel}"
+        channel = f"https://youtube.com/{channel}/videos"
     
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
-        'ignoreerrors': True,  # Skip any problematic entries
-        'extract_flat': 'in_playlist',  # More efficient for playlists
-    }
-    
-    results = []
-    
-    for url in approaches:
-        if results and len(results) >= count:  # If we already got enough results, stop trying
-            break
-            
-        print(f"  Trying: {url}")
-        
-        try:
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=False)
-                
-                # Handle different response structures
-                entries = []
-                if 'entries' in info:
-                    entries = info['entries']
-                elif 'videos' in info:
-                    entries = info['videos']
-                else:
-                    # Try to get uploads playlist ID
-                    uploads_id = None
-                    if 'uploader_id' in info:
-                        uploads_id = info.get('uploader_id')
-                    elif 'channel_id' in info:
-                        uploads_id = info.get('channel_id')
-                    
-                    if uploads_id:
-                        # Get uploads playlist
-                        uploads_playlist = f"https://www.youtube.com/channel/{uploads_id}/videos"
-                        info2 = ydl.extract_info(uploads_playlist, download=False)
-                        if 'entries' in info2:
-                            entries = info2['entries']
-                
-                # Extract video information
-                for entry in entries:
-                    if entry is None:
-                        continue
-                        
-                    if len(results) >= count:
-                        break
-                    
-                    # Handle different ID formats
-                    video_id = entry.get('id', '')
-                    if video_id and '/' in video_id:
-                        video_id = video_id.split('/')[-1]
-                    
-                    # Get video URL
-                    if 'url' in entry and entry['url']:
-                        video_url = entry['url']
-                    elif video_id:
-                        video_url = f"https://youtube.com/watch?v={video_id}"
-                    else:
-                        continue
-                    
-                    result = {
-                        'title': entry.get('title', 'N/A'),
-                        'url': video_url,
-                        'video_id': video_id,
-                        'duration': entry.get('duration', 0),
-                        'views': entry.get('view_count', 0),
-                        'upload_date': entry.get('upload_date', 'N/A'),
-                        'uploader': info.get('uploader', entry.get('uploader', 'N/A'))
-                    }
-                    results.append(result)
-                    
-        except Exception as e:
-            print(f"  Failed with error: {str(e)}")
-            continue
-    
-    # If we still don't have enough videos, try alternative extraction method
-    if len(results) < count:
-        print(f"  Only got {len(results)} videos, trying alternative method...")
-        alt_results = get_recent_videos_alternative(original_channel, count)
-        # Merge results without duplicates
-        existing_urls = {r['url'] for r in results}
-        for r in alt_results:
-            if r['url'] not in existing_urls and len(results) < count:
-                results.append(r)
-    
-    # Save results
-    if results:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = Path(RESULTS_DIR) / f"recent_{timestamp}.json"
-        
-        with open(output_file, 'w', encoding='utf-8') as f:
-            json.dump(results, f, indent=2, ensure_ascii=False)
-        
-        text_file = Path(RESULTS_DIR) / f"recent_{timestamp}.txt"
-        with open(text_file, 'w', encoding='utf-8') as f:
-            f.write(f"Recent Videos from: {original_channel}\n")
-            f.write(f"Requested: {count} videos | Found: {len(results)} videos\n")
-            f.write(f"{'='*60}\n\n")
-            for i, result in enumerate(results, 1):
-                f.write(f"{i}. {result['title']}\n")
-                f.write(f"   URL: {result['url']}\n")
-                f.write(f"   Video ID: {result['video_id']}\n")
-                f.write(f"   Upload Date: {result['upload_date']}\n")
-                f.write(f"   Duration: {result['duration']} seconds\n")
-                if result['views']:
-                    f.write(f"   Views: {result['views']:,}\n")
-                f.write(f"\n")
-        
-        print(f"✅ Found {len(results)} recent videos (requested {count})")
-    else:
-        print(f"❌ No videos found")
-    
-    return results
-def download_playlist(playlist_url):
-    """Download entire playlist with anti-detection"""
-    print(f"\n🎵 Downloading playlist: {playlist_url}")
-    
-    output_template = f"{DOWNLOAD_DIR}/playlist/%(playlist_title)s/%(title)s_%(id)s.%(ext)s"
-    
-    ydl_opts = {
-        'format': 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360]/best',
-        'outtmpl': output_template,
-        'quiet': False,
-        'restrictfilenames': True,
+        'extract_flat': 'in_playlist',
+        'playlistend': count,
         'ignoreerrors': True,
         'user_agent': get_random_user_agent(),
-        'sleep_interval': random.uniform(2, 5),
-        'sleep_interval_requests': random.uniform(1, 3),
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android'],
+                'skip': ['webpage'],
+            }
+        },
     }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(playlist_url, download=True)
-            print(f"✅ Downloaded playlist: {info.get('title', 'Unknown')}")
-            return True
+            info = ydl.extract_info(channel, download=False)
+            
+            if info and 'entries' in info:
+                results = []
+                entries = info['entries'][:count]
+                
+                for entry in entries:
+                    if entry:
+                        results.append({
+                            'title': entry.get('title', 'N/A'),
+                            'url': f"https://youtube.com/watch?v={entry.get('id', '')}",
+                            'video_id': entry.get('id', ''),
+                            'uploader': info.get('uploader', 'N/A')
+                        })
+                
+                if results:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    output_file = Path(RESULTS_DIR) / f"channel_{timestamp}.json"
+                    
+                    with open(output_file, 'w', encoding='utf-8') as f:
+                        json.dump(results, f, indent=2, ensure_ascii=False)
+                    
+                    print(f"✅ Found {len(results)} videos")
+                    return results
+        
+        print("❌ No videos found")
+        return []
+        
     except Exception as e:
-        print(f"❌ Error downloading playlist: {str(e)}")
-        return False
+        print(f"❌ Error: {str(e)}")
+        return []
+
+def download_video(url):
+    """Main download function with fallbacks"""
+    # Try method 1: yt-dlp Python API
+    success = download_with_ytdlp(url)
+    
+    # Try method 2: yt-dlp subprocess
+    if not success:
+        print("\n⚠️ Trying alternative method...")
+        success = download_with_yt_dlp_python(url)
+    
+    # Try method 3: Use Android client only
+    if not success:
+        print("\n⚠️ Last attempt with Android TV client...")
+        ydl_opts = {
+            'format': 'worst',
+            'outtmpl': f"{DOWNLOAD_DIR}/%(title).100s_%(id)s.%(ext)s",
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android_tv', 'tv'],
+                    'skip': ['webpage', 'configs'],
+                }
+            },
+            'user_agent': 'Mozilla/5.0 (Linux; Android 10; BRAVIA 4K) AppleWebKit/537.36',
+            'sleep_interval': 10,
+            'retries': 20,
+            'force_ipv4': True,
+        }
+        
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                if info:
+                    print(f"✅ Finally downloaded: {info.get('title')}")
+                    return True
+        except Exception as e:
+            print(f"❌ All methods failed: {str(e)}")
+    
+    return success
 
 def read_commands():
-    """Read and parse commands from commands.txt"""
+    """Read commands from file"""
     commands = []
     
     if not os.path.exists(COMMANDS_FILE):
-        print(f"Commands file not found: {COMMANDS_FILE}")
+        print(f"❌ Commands file not found: {COMMANDS_FILE}")
+        print("\n📝 Create commands.txt with:")
+        print("search python tutorial")
+        print("download https://youtube.com/watch?v=VIDEO_ID")
+        print("recent @channel_name")
+        print("recent 15 @channel_name")
         return commands
     
-    with open(COMMANDS_FILE, 'r') as f:
-        lines = f.readlines()
-    
-    for line in lines:
-        line = line.strip()
-        if not line or line.startswith('#'):
-            continue
-        
-        # Parse different command types
-        if line.startswith('search '):
-            query = line[7:].strip()
-            commands.append(('search', query))
-        elif line.startswith('download '):
-            url = line[9:].strip()
-            commands.append(('download', url))
-        elif line.startswith('recent '):
-            value = line[7:].strip()
-            commands.append(('recent', value))
-        elif line.startswith('playlist '):
-            url = line[9:].strip()
-            commands.append(('playlist', url))
+    with open(COMMANDS_FILE, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                if line.startswith('search '):
+                    commands.append(('search', line[7:].strip()))
+                elif line.startswith('download '):
+                    commands.append(('download', line[9:].strip()))
+                elif line.startswith('recent '):
+                    parts = line[7:].strip().split(maxsplit=1)
+                    if len(parts) == 2 and parts[0].isdigit():
+                        commands.append(('recent', (int(parts[0]), parts[1])))
+                    else:
+                        commands.append(('recent', (10, line[7:].strip())))
     
     return commands
 
 def process_commands():
-    """Process all commands from the commands file"""
-    print("🚀 YouTube Video Downloader Started (Anti-Detection Mode)")
+    """Process all commands"""
+    print("🚀 YouTube Downloader (Anti-Bot Mode)")
     print("="*50)
-    print(f"Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"Results directory: {RESULTS_DIR}")
-    print(f"Commands file: {COMMANDS_FILE}")
+    print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Download dir: {DOWNLOAD_DIR}")
     print("="*50)
     
     setup_directories()
     commands = read_commands()
     
     if not commands:
-        print("\n⚠️  No commands found in commands.txt")
-        print("\n📝 Example commands.txt content:")
-        print("#" + "="*60)
-        print("# Search for videos")
-        print("search python tutorial 2024")
-        print("\n# Download a single video (lowest quality, minimum 360p)")
-        print("download https://youtube.com/watch?v=VIDEO_ID")
-        print("\n# Get 15 recent videos from a channel")
-        print("recent 15 @mkbhd")
-        print("\n# Download a playlist (all videos at lowest quality)")
-        print("playlist https://youtube.com/playlist?list=PLAYLIST_ID")
-        print("#" + "="*60)
+        print("\n⚠️ No commands found. Example commands.txt:")
+        print("download https://youtube.com/watch?v=dQw4w9WgXcQ")
+        print("search funny cats")
+        print("recent @mkbhd")
         return
     
-    print(f"\n📋 Found {len(commands)} command(s) to process\n")
+    print(f"\n📋 Processing {len(commands)} command(s):\n")
     
     for idx, (cmd_type, cmd_value) in enumerate(commands, 1):
-        print(f"[{idx}/{len(commands)}] Processing command: {cmd_type} {cmd_value}")
+        print(f"[{idx}/{len(commands)}] {cmd_type}: {cmd_value}")
         
-        if cmd_type == 'search':
+        if cmd_type == 'download':
+            download_video(cmd_value)
+        elif cmd_type == 'search':
             search_videos(cmd_value)
-        elif cmd_type == 'download':
-            download_video_with_proxy(cmd_value)
         elif cmd_type == 'recent':
-            # Check if a number is specified (e.g., "recent 15 @channel")
-            parts = cmd_value.split()
-            if len(parts) >= 2 and parts[0].isdigit():
-                count = int(parts[0])
-                channel = ' '.join(parts[1:])
-                get_recent_videos(channel, count)
-            else:
-                get_recent_videos(cmd_value, 10)
-        elif cmd_type == 'playlist':
-            download_playlist(cmd_value)
-        else:
-            print(f"⚠️  Unknown command type: {cmd_type}")
+            count, channel = cmd_value
+            get_channel_videos(channel, count)
         
-        # Add delay between commands to avoid rate limiting
         if idx < len(commands):
-            delay = random.uniform(5, 10)
-            print(f"\n⏳ Waiting {delay:.1f} seconds before next command...")
-            time.sleep(delay)
-        
-        print("-"*50)
+            wait = random.uniform(10, 20)
+            print(f"\n⏳ Waiting {wait:.0f}s...\n")
+            time.sleep(wait)
     
-    # Print summary
+    # Summary
     print("\n" + "="*50)
-    print("✅ All commands processed successfully!")
-    print(f"📁 Results saved in: {RESULTS_DIR}")
+    print("✅ Commands processed!")
     
+    # List results
     result_files = list(Path(RESULTS_DIR).glob("*"))
+    downloads = list(Path(DOWNLOAD_DIR).glob("*"))
+    
+    if downloads:
+        print(f"\n📁 Downloads ({len(downloads)} files):")
+        for f in downloads[:5]:
+            size_mb = f.stat().st_size / (1024*1024)
+            print(f"   - {f.name} ({size_mb:.1f} MB)")
+    
     if result_files:
-        print(f"\n📄 Generated files ({len(result_files)}):")
-        for f in result_files[:10]:
-            size = f.stat().st_size
-            if size < 1024:
-                size_str = f"{size} B"
-            elif size < 1024*1024:
-                size_str = f"{size/1024:.1f} KB"
-            else:
-                size_str = f"{size/(1024*1024):.1f} MB"
-            print(f"   - {f.name} ({size_str})")
-        if len(result_files) > 10:
-            print(f"   ... and {len(result_files)-10} more files")
+        print(f"\n📄 Results ({len(result_files)} files):")
+        for f in result_files[:5]:
+            print(f"   - {f.name}")
     
     print("="*50)
 
-def main():
-    """Main entry point"""
-    process_commands()
-
 if __name__ == "__main__":
-    main()
+    process_commands()
