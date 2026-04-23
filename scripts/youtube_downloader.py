@@ -37,84 +37,149 @@ def setup_directories():
 def get_random_user_agent():
     """Get a random user agent to avoid detection"""
     return random.choice(USER_AGENTS)
+
 def download_video_with_proxy(url, output_template=None):
     """
-    Download a video using yt-dlp with multiple anti-detection measures
-    No cookies required - uses alternative clients and tokens
+    Download a video using alternative YouTube frontends to avoid bot detection
+    No cookies or proxies required
     """
     print(f"\n📥 Downloading: {url}")
     
     if output_template is None:
         output_template = f"{DOWNLOAD_DIR}/%(title)s_%(id)s.%(ext)s"
     
-    # Advanced anti-detection options for GitHub Actions
+    # Extract video ID from various YouTube URL formats
+    video_id = None
+    
+    # Pattern for youtube.com/watch?v=XXXXX
+    if 'youtube.com/watch' in url:
+        match = re.search(r'[?&]v=([^&]+)', url)
+        if match:
+            video_id = match.group(1)
+    
+    # Pattern for youtu.be/XXXXX
+    elif 'youtu.be/' in url:
+        video_id = url.split('youtu.be/')[-1].split('?')[0]
+    
+    # Pattern for youtube.com/embed/XXXXX
+    elif 'youtube.com/embed/' in url:
+        video_id = url.split('youtube.com/embed/')[-1].split('?')[0]
+    
+    # Pattern for youtube.com/shorts/XXXXX
+    elif 'youtube.com/shorts/' in url:
+        video_id = url.split('youtube.com/shorts/')[-1].split('?')[0]
+    
+    if not video_id:
+        print(f"❌ Could not extract video ID from URL: {url}")
+        return False
+    
+    print(f"  Video ID: {video_id}")
+    
+    # List of alternative YouTube frontends (Invidious instances)
+    # These are privacy-focused frontends that don't have bot detection
+    frontends = [
+        f"https://yewtu.be/watch?v={video_id}",
+        f"https://inv.riverside.rocks/watch?v={video_id}",
+        f"https://invidious.slipfox.xyz/watch?v={video_id}",
+        f"https://inv.vern.cc/watch?v={video_id}",
+        f"https://invidious.privacydev.net/watch?v={video_id}",
+        f"https://inv.odyssey346.dev/watch?v={video_id}",
+        f"https://invidious.flokinet.to/watch?v={video_id}",
+        f"https://vid.puffyan.us/watch?v={video_id}",
+        f"https://invidious.nerdvpn.de/watch?v={video_id}",
+        f"https://inv.bp.projectsegfau.lt/watch?v={video_id}",
+    ]
+    
+    # Shuffle frontends to distribute load
+    random.shuffle(frontends)
+    
+    # Standard yt-dlp options for low quality (minimum 360p)
     ydl_opts = {
-        'format': 'worst[height>=360]/best[height<=360]/best',
+        'format': 'best[height>=360][height<=480]/best[height<=480]/worst[height>=360]',
         'outtmpl': output_template,
         'quiet': False,
         'no_warnings': False,
         'restrictfilenames': True,
-        
-        # Use multiple clients to avoid bot detection
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['android', 'web', 'ios'],  # Try multiple clients
-                'skip': ['hls', 'dash'],  # Skip problematic formats
-                'player_skip': ['configs'],  # Skip configs that might trigger bot detection
-            }
-        },
-        
-        # Randomize request patterns
-        'sleep_interval': random.uniform(5, 10),  # Longer delays
-        'sleep_interval_requests': random.uniform(3, 7),
-        'throttledratelimit': 500000,  # 500 KB/s limit
-        
-        # Use mobile user agents
-        'user_agent': random.choice([
-            'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.6045.163 Mobile Safari/537.36',
-            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1',
-        ]),
-        
-        # Add headers to look like a real mobile app
-        'add_header': [
-            'Accept: */*',
-            'Accept-Language: en-US,en;q=0.9',
-            'Origin: https://www.youtube.com',
-            'Referer: https://www.youtube.com',
-        ],
-        
-        # Retry configuration
-        'retries': 15,
-        'fragment_retries': 15,
-        'skip_unavailable_fragments': True,
-        
-        # Use innertube API with visitor data
-        'innertube_host': 'www.youtube.com',
-        'innertube_key': 'AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8',  # Public API key
+        'retries': 5,
+        'fragment_retries': 5,
+        'sleep_interval': random.uniform(2, 5),
     }
     
-    try:
-        # Add longer delay before starting
-        time.sleep(random.uniform(5, 15))
+    # Try each frontend until one works
+    for i, frontend_url in enumerate(frontends, 1):
+        print(f"  Attempt {i}/{len(frontends)}: Trying {frontend_url.split('/')[2]}...")
         
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        try:
+            # Add delay between attempts to avoid rate limiting
+            if i > 1:
+                time.sleep(random.uniform(3, 7))
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(frontend_url, download=True)
+                
+                # Get the actual downloaded filename
+                filename = ydl.prepare_filename(info)
+                
+                # Save metadata
+                metadata = {
+                    'title': info.get('title', 'N/A'),
+                    'original_url': url,
+                    'video_id': video_id,
+                    'frontend_used': frontend_url,
+                    'duration': info.get('duration', 0),
+                    'upload_date': info.get('upload_date', 'N/A'),
+                    'views': info.get('view_count', 0),
+                    'filename': filename,
+                    'format': info.get('format', 'N/A'),
+                    'height': info.get('height', 0)
+                }
+                
+                metadata_file = Path(RESULTS_DIR) / f"download_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+                with open(metadata_file, 'w', encoding='utf-8') as f:
+                    json.dump(metadata, f, indent=2, ensure_ascii=False)
+                
+                print(f"✅ Downloaded: {info.get('title')} (Quality: {info.get('height', 'Unknown')}p)")
+                print(f"   Used frontend: {frontend_url.split('/')[2]}")
+                return True
+                
+        except Exception as e:
+            error_msg = str(e)
+            if "404" in error_msg or "Not Found" in error_msg:
+                print(f"  ✗ Frontend returned 404 (video may be unavailable)")
+            elif "timed out" in error_msg.lower():
+                print(f"  ✗ Frontend timeout - trying next")
+            else:
+                print(f"  ✗ Failed: {error_msg[:100]}")
+            continue
+    
+    # If all frontends fail, try one more time with direct YouTube URL as fallback
+    print(f"\n  All frontends failed, trying direct YouTube URL as fallback...")
+    try:
+        fallback_opts = {
+            'format': 'worst[height>=360]/best[height<=360]',
+            'outtmpl': output_template,
+            'quiet': False,
+            'no_warnings': False,
+            'restrictfilenames': True,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web'],
+                }
+            },
+            'user_agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36',
+            'sleep_interval': random.uniform(3, 6),
+        }
+        
+        with yt_dlp.YoutubeDL(fallback_opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
-            
-            print(f"✅ Downloaded: {info.get('title')}")
+            print(f"✅ Downloaded (direct): {info.get('title')}")
             return True
-            
     except Exception as e:
-        error_msg = str(e)
-        if "Sign in to confirm you're not a bot" in error_msg:
-            print(f"❌ Bot detection triggered. Try these solutions:")
-            print(f"   1. Use your own cookies (see below)")
-            print(f"   2. Run at a different time of day")
-            print(f"   3. Reduce download frequency")
-            print(f"   4. Use a different GitHub account (different IP)")
-        else:
-            print(f"❌ Error downloading: {error_msg}")
-        return False
+        print(f"❌ Fallback also failed: {str(e)}")
+    
+    print(f"❌ Failed to download video {video_id} from all sources")
+    return False
+
 def search_videos(query, max_results=10):
     """Search YouTube for videos with anti-detection"""
     print(f"\n🔍 Searching for: {query}")
