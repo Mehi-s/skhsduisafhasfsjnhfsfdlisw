@@ -4,4 +4,4 @@
 #   search [query] - Search YouTube
 #   recent [channel] - Get recent videos from channel
   
-search مجتبی خامنه ای
+search ai myana weisse
