@@ -4,4 +4,4 @@
 #   search [query] - Search YouTube
 #   recent [channel] - Get recent videos from channel
   
-recent مجتبی خامنه ای
+search مجتبی خامنه ای
