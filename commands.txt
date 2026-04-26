@@ -4,4 +4,4 @@
 #   search [query] - Search YouTube
 #   recent [channel] - Get recent videos from channel
 
-recent Marina Wyss - AI & Machine Learning
+search Marina Wyss - AI & Machine Learning
