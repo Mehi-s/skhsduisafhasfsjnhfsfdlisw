@@ -3,5 +3,5 @@
 # Supported commands:
 #   search [query] - Search YouTube
 #   recent [channel] - Get recent videos from channel
-search تهران بعد از جنگ
-search تخریب ها در تهران
+
+search جنگ ایران و آمریکا وحید آنلاین
