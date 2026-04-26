@@ -3,4 +3,5 @@
 # Supported commands:
 #   search [query] - Search YouTube
 #   recent [channel] - Get recent videos from channel
-search مجتبی خامنه ای
+search تهران بعد از جنگ
+search تخریب ها در تهران
