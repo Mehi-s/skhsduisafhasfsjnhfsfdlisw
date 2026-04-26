@@ -38,76 +38,6 @@ def get_random_user_agent():
     """Get a random user agent to avoid detection"""
     return random.choice(USER_AGENTS)
 
-def download_video_with_proxy(url, output_template=None):
-    """
-    Download a video using yt-dlp with proxy-like behavior
-    Uses rotating user agents and other anti-detection measures
-    """
-    print(f"\n📥 Downloading: {url}")
-    
-    if output_template is None:
-        output_template = f"{DOWNLOAD_DIR}/%(title)s_%(id)s.%(ext)s"
-    
-    # Anti-detection options
-    ydl_opts = {
-        'format': 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360]/best',  # Lowest quality >=360p
-        'outtmpl': output_template,
-        'quiet': False,
-        'no_warnings': False,
-        'restrictfilenames': True,
-        'user_agent': get_random_user_agent(),
-        'referer': 'https://www.google.com/',
-        'add_header': [
-            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language: en-us,en;q=0.5',
-            'Accept-Encoding: gzip, deflate',
-            'Connection: keep-alive',
-        ],
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['android', 'web'],  # Use mobile client when possible
-                'skip': ['hls', 'dash'],
-            }
-        },
-        'throttledratelimit': 1000000,  # 1 MB/s limit to avoid triggering rate limits
-        'retries': 10,
-        'fragment_retries': 10,
-        'sleep_interval': random.uniform(3, 7),  # Random sleep between requests
-        'sleep_interval_requests': random.uniform(1, 3),
-    }
-    
-    try:
-        # Add a small delay before downloading
-        time.sleep(random.uniform(2, 5))
-        
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
-            
-            # Save metadata
-            metadata = {
-                'title': info.get('title', 'N/A'),
-                'url': url,
-                'duration': info.get('duration', 0),
-                'upload_date': info.get('upload_date', 'N/A'),
-                'views': info.get('view_count', 0),
-                'likes': info.get('like_count', 0),
-                'filename': filename,
-                'format': info.get('format', 'N/A'),
-                'height': info.get('height', 0)
-            }
-            
-            metadata_file = Path(RESULTS_DIR) / f"download_metadata_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-            with open(metadata_file, 'w', encoding='utf-8') as f:
-                json.dump(metadata, f, indent=2, ensure_ascii=False)
-            
-            print(f"✅ Downloaded: {info.get('title')} (Quality: {info.get('height', 'Unknown')}p)")
-            return True
-            
-    except Exception as e:
-        print(f"❌ Error downloading: {str(e)}")
-        return False
-
 def search_videos(query, max_results=10):
     """Search YouTube for videos with anti-detection"""
     print(f"\n🔍 Searching for: {query}")
@@ -118,7 +48,7 @@ def search_videos(query, max_results=10):
         'extract_flat': True,
         'force_generic_extractor': False,
         'user_agent': get_random_user_agent(),
-        'sleep_interval': random.uniform(1, 3),
+        'sleep_interval': random.uniform(1, 2),
     }
     
     results = []
@@ -140,8 +70,7 @@ def search_videos(query, max_results=10):
                     }
                     results.append(result)
                     
-        # Save search results to JSON
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
         output_file = Path(RESULTS_DIR) / f"search_{query}.json"
         
         with open(output_file, 'w', encoding='utf-8') as f:
@@ -177,7 +106,7 @@ def get_recent_videos_alternative(channel_url, count=10):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             # Get channel info
             if not channel_url.startswith('http'):
-                channel_url = f"https://youtube.com/@{channel_url}"
+                channel_url = f"https://youtube.com/@{channel_url.replace('@','')}"
             
             info = ydl.extract_info(channel_url, download=False)
             channel_name = info.get('uploader', info.get('channel', info.get('title', '')))
@@ -322,13 +251,12 @@ def get_recent_videos(channel_url, count=10):
     
     # Save results
     if results:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = Path(RESULTS_DIR) / f"recent_{timestamp}.json"
+        output_file = Path(RESULTS_DIR) / f"recent_{clean_channel}.json"
         
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(results, f, indent=2, ensure_ascii=False)
         
-        text_file = Path(RESULTS_DIR) / f"recent_{timestamp}.txt"
+        text_file = Path(RESULTS_DIR) / f"recent_{clean_channel}.txt"
         with open(text_file, 'w', encoding='utf-8') as f:
             f.write(f"Recent Videos from: {original_channel}\n")
             f.write(f"Requested: {count} videos | Found: {len(results)} videos\n")
@@ -348,32 +276,6 @@ def get_recent_videos(channel_url, count=10):
         print(f"❌ No videos found")
     
     return results
-def download_playlist(playlist_url):
-    """Download entire playlist with anti-detection"""
-    print(f"\n🎵 Downloading playlist: {playlist_url}")
-    
-    output_template = f"{DOWNLOAD_DIR}/playlist/%(playlist_title)s/%(title)s_%(id)s.%(ext)s"
-    
-    ydl_opts = {
-        'format': 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/best[height<=360]/best',
-        'outtmpl': output_template,
-        'quiet': False,
-        'restrictfilenames': True,
-        'ignoreerrors': True,
-        'user_agent': get_random_user_agent(),
-        'sleep_interval': random.uniform(2, 5),
-        'sleep_interval_requests': random.uniform(1, 3),
-    }
-    
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(playlist_url, download=True)
-            print(f"✅ Downloaded playlist: {info.get('title', 'Unknown')}")
-            return True
-    except Exception as e:
-        print(f"❌ Error downloading playlist: {str(e)}")
-        return False
-
 def read_commands():
     """Read and parse commands from commands.txt"""
     commands = []
