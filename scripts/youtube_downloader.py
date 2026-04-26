@@ -142,13 +142,13 @@ def search_videos(query, max_results=10):
                     
         # Save search results to JSON
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = Path(RESULTS_DIR) / f"search_{timestamp}.json"
+        output_file = Path(RESULTS_DIR) / f"search_{query}.json"
         
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(results, f, indent=2, ensure_ascii=False)
         
         # Also create a readable text file
-        text_file = Path(RESULTS_DIR) / f"search_{timestamp}.txt"
+        text_file = Path(RESULTS_DIR) / f"search_{query}.txt"
         with open(text_file, 'w', encoding='utf-8') as f:
             f.write(f"Search Results for: {query}\n")
             f.write(f"{'='*60}\n\n")
