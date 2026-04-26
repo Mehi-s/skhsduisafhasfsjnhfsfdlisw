@@ -3,4 +3,4 @@
 # Supported commands:
 #   search [query] - Search YouTube
 #   recent [channel] - Get recent videos from channel
-recent 3blue1brown
+recent kouman
