@@ -4,4 +4,5 @@
 #   search [query] - Search YouTube
 #   recent [channel] - Get recent videos from channel
 
-search Marina Wyss - AI & Machine Learning
+search kheshnova
+recent bpluspodcast
