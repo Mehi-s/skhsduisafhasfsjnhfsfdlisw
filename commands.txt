@@ -1,8 +1,2 @@
-# YouTube Downloader Commands
-# Each command on a new line
-# Supported commands:
-#   search [query] - Search YouTube
-#   recent [channel] - Get recent videos from channel
-
-search economy
-recent bpluspodcast
+search جام جهانی ::reqid::92de2b7e-a035-4168-970c-ac4318669324
+recent bpluspodcast ::reqid::eed6aec0-6e00-4b32-b19f-f027a99af492
