@@ -1,0 +1,64 @@
+Recent Videos from: 3blue1brown  [ReqID: 8d68c086-a15f-4c54-8542-ae7e4809da03]
+Requested: 10 videos | Found: 10 videos
+============================================================
+
+1. How (and why) to take a logarithm of an image
+   URL: https://www.youtube.com/watch?v=ldxFjLJ3rVY
+   Video ID: ldxFjLJ3rVY
+   Upload Date: N/A
+   Duration: 2692.0 seconds
+
+2. The most beautiful formula not enough people understand
+   URL: https://www.youtube.com/watch?v=fsLh-NYhOoU
+   Video ID: fsLh-NYhOoU
+   Upload Date: N/A
+   Duration: 3624.0 seconds
+
+3. The Hairy Ball Theorem
+   URL: https://www.youtube.com/watch?v=BHdbsHFs2P0
+   Video ID: BHdbsHFs2P0
+   Upload Date: N/A
+   Duration: 1780.0 seconds
+
+4. Why Laplace transforms are so useful
+   URL: https://www.youtube.com/watch?v=FE-hM1kRK4Y
+   Video ID: FE-hM1kRK4Y
+   Upload Date: N/A
+   Duration: 1385.0 seconds
+
+5. But what is a Laplace Transform?
+   URL: https://www.youtube.com/watch?v=j0wJBEZdwLs
+   Video ID: j0wJBEZdwLs
+   Upload Date: N/A
+   Duration: 2081.0 seconds
+
+6. The Physics of Euler's Formula | Laplace Transform Prelude
+   URL: https://www.youtube.com/watch?v=-j8PzkZ70Lg
+   Video ID: -j8PzkZ70Lg
+   Upload Date: N/A
+   Duration: 1669.0 seconds
+
+7. What was Euclid really doing? | Guest video by Ben Syversen
+   URL: https://www.youtube.com/watch?v=M-MgQC6z3VU
+   Video ID: M-MgQC6z3VU
+   Upload Date: N/A
+   Duration: 2009.0 seconds
+
+8. Exploration & Epiphany | Guest video by Paul Dancstep
+   URL: https://www.youtube.com/watch?v=_BrFKp-U8GI
+   Video ID: _BrFKp-U8GI
+   Upload Date: N/A
+   Duration: 3132.0 seconds
+
+9. Simulating and understanding phase change | Guest video by Vilas Winstein
+   URL: https://www.youtube.com/watch?v=itRV2jEtV8Q
+   Video ID: itRV2jEtV8Q
+   Upload Date: N/A
+   Duration: 2463.0 seconds
+
+10. The AI that solved IMO Geometry Problems | Guest video by @Aleph 0
+   URL: https://www.youtube.com/watch?v=4NlrfOl0l8U
+   Video ID: 4NlrfOl0l8U
+   Upload Date: N/A
+   Duration: 811.0 seconds
+
