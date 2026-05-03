@@ -1,0 +1,63 @@
+Search Results for: Spiking_neural_network  [ReqID: 9ac988e9-649c-4de1-9854-51ac54c80a29]
+============================================================
+
+1. Spiking Neural Networks for More Efficient AI Algorithms
+   URL: https://youtube.com/watch?v=PeW-TN3P1hk
+   Channel: WaterlooAI
+   Duration: 3342.0 seconds
+   Views: 84,360
+
+2. Spiking Neural Networks (SNN) - in 5 Minutes
+   URL: https://youtube.com/watch?v=bBIKFh2AzD0
+   Channel: AI Tutorials 4 All
+   Duration: 330.0 seconds
+   Views: 4,728
+
+3. Cosyne 2022 Tutorial on Spiking Neural Networks - Part 1/2
+   URL: https://youtube.com/watch?v=GTXTQ_sOxak
+   Channel: Neural Reckoning
+   Duration: 2824.0 seconds
+   Views: 53,994
+
+4. Training Spiking Neural Networks Using Lessons From Deep Learning
+   URL: https://youtube.com/watch?v=zldal7b7sJ4
+   Channel: iCAS Lab
+   Duration: 3069.0 seconds
+   Views: 27,046
+
+5. Spiking Neural Networks Explained | The Future of AI That Thinks Like the Brain
+   URL: https://youtube.com/watch?v=ug92eUh_pYo
+   Channel: Innatera
+   Duration: 163.0 seconds
+   Views: 4,590
+
+6. Spiking neural network from scratch,. bio inspired, no backpropagation or SGD
+   URL: https://youtube.com/watch?v=BRksl6mWS-w
+   Channel: echohive
+   Duration: 1285.0 seconds
+   Views: 4,488
+
+7. Neuramorphic Autonomous Driving Demo | Spiking Neural Network
+   URL: https://youtube.com/watch?v=83hy1fc6ppE
+   Channel: Neuramorphic
+   Duration: 79.0 seconds
+   Views: 299
+
+8. A Beginner-Friendly Introduction to Spiking Neural Networks
+   URL: https://youtube.com/watch?v=1emzZdfMzy0
+   Channel: Qianming Huang
+   Duration: 1866.0 seconds
+   Views: 1,710
+
+9. Brainchip Platform Uses Spiking Neural Networks for Low Power Operations
+   URL: https://youtube.com/watch?v=svjWaURF--s
+   Channel: Electronic Design
+   Duration: 211.0 seconds
+   Views: 1,721
+
+10. ESWEEK 2021 Education - Spiking Neural Networks
+   URL: https://youtube.com/watch?v=7TybETlCslM
+   Channel: Embedded Systems Week (ESWEEK)
+   Duration: 7133.0 seconds
+   Views: 27,840
+
