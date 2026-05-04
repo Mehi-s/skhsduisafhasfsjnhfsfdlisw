@@ -1,1 +1,2 @@
-search Pistols ::reqid::6fca146d-8ac6-4b8b-b120-b9a30d4b1a69
+search shear_force ::reqid::0ebc9716-4be6-422b-9bd8-4cf2a4b0035a
+search Vogue_beauty ::reqid::3f7d6bf5-de3c-462c-a5ed-3c56a7f802a1
