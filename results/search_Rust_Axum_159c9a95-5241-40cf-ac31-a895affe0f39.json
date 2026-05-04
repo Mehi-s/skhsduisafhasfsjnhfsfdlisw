@@ -1,0 +1,72 @@
+[
+  {
+    "title": "Creating an Axum Web Server in Rust is easy!",
+    "url": "https://youtube.com/watch?v=FDWKlJmHv6k",
+    "duration": 1266.0,
+    "views": 17709,
+    "uploader": "Flo Woelki"
+  },
+  {
+    "title": "Build REST APIs with the Rust Axum Web Framework",
+    "url": "https://youtube.com/watch?v=7RlVM0D4CEA",
+    "duration": 5966.0,
+    "views": 31507,
+    "uploader": "Trevor Sullivan"
+  },
+  {
+    "title": "Rust Axum in 2026: Is it actually better than Go, Python  and Node?",
+    "url": "https://youtube.com/watch?v=CdVO7oDoAGk",
+    "duration": 161.0,
+    "views": 8796,
+    "uploader": "Francesco Ciulla"
+  },
+  {
+    "title": "Rust Axum Full Course - Web Development (GitHub repo updated to Axum 0.7)",
+    "url": "https://youtube.com/watch?v=XZtlD_m59sM",
+    "duration": 4754.0,
+    "views": 239499,
+    "uploader": "Jeremy Chone"
+  },
+  {
+    "title": "Build a Real World Full Stack App with Rust (Axum, SQLx, Leptos)",
+    "url": "https://youtube.com/watch?v=WmGv-lZgr7M",
+    "duration": 3226.0,
+    "views": 4426,
+    "uploader": "Francesco Ciulla and Rustify — Rust in Production"
+  },
+  {
+    "title": "Getting started with Tokio. The ultimate starter guide to writing async Rust.",
+    "url": "https://youtube.com/watch?v=dOzrO40jgbU",
+    "duration": 424.0,
+    "views": 117412,
+    "uploader": "Dreams of Code"
+  },
+  {
+    "title": "Actix (Rust) vs Axum (Rust) vs Rocket (Rust): Performance Benchmark in Kubernetes #206",
+    "url": "https://youtube.com/watch?v=KA_w_jOGils",
+    "duration": 514.0,
+    "views": 46937,
+    "uploader": "Anton Putra"
+  },
+  {
+    "title": "Lets Build An Event Logging REST API With Rust And Axum",
+    "url": "https://youtube.com/watch?v=zYjNm6ooUqs",
+    "duration": 797.0,
+    "views": 1057,
+    "uploader": "Syed Hussim Dev"
+  },
+  {
+    "title": "Practical Clean Architecture in Rust [with Axum Template]",
+    "url": "https://youtube.com/watch?v=TrNpyFMtnzI",
+    "duration": 1726.0,
+    "views": 21259,
+    "uploader": "Green Tea Coding"
+  },
+  {
+    "title": "Decrusting the axum crate",
+    "url": "https://youtube.com/watch?v=Wnb_n5YktO8",
+    "duration": 7947.0,
+    "views": 97522,
+    "uploader": "Jon Gjengset"
+  }
+]

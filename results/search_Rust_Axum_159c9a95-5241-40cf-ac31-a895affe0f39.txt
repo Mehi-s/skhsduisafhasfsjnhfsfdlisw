@@ -1,0 +1,63 @@
+Search Results for: Rust_Axum  [ReqID: 159c9a95-5241-40cf-ac31-a895affe0f39]
+============================================================
+
+1. Creating an Axum Web Server in Rust is easy!
+   URL: https://youtube.com/watch?v=FDWKlJmHv6k
+   Channel: Flo Woelki
+   Duration: 1266.0 seconds
+   Views: 17,709
+
+2. Build REST APIs with the Rust Axum Web Framework
+   URL: https://youtube.com/watch?v=7RlVM0D4CEA
+   Channel: Trevor Sullivan
+   Duration: 5966.0 seconds
+   Views: 31,507
+
+3. Rust Axum in 2026: Is it actually better than Go, Python  and Node?
+   URL: https://youtube.com/watch?v=CdVO7oDoAGk
+   Channel: Francesco Ciulla
+   Duration: 161.0 seconds
+   Views: 8,796
+
+4. Rust Axum Full Course - Web Development (GitHub repo updated to Axum 0.7)
+   URL: https://youtube.com/watch?v=XZtlD_m59sM
+   Channel: Jeremy Chone
+   Duration: 4754.0 seconds
+   Views: 239,499
+
+5. Build a Real World Full Stack App with Rust (Axum, SQLx, Leptos)
+   URL: https://youtube.com/watch?v=WmGv-lZgr7M
+   Channel: Francesco Ciulla and Rustify — Rust in Production
+   Duration: 3226.0 seconds
+   Views: 4,426
+
+6. Getting started with Tokio. The ultimate starter guide to writing async Rust.
+   URL: https://youtube.com/watch?v=dOzrO40jgbU
+   Channel: Dreams of Code
+   Duration: 424.0 seconds
+   Views: 117,412
+
+7. Actix (Rust) vs Axum (Rust) vs Rocket (Rust): Performance Benchmark in Kubernetes #206
+   URL: https://youtube.com/watch?v=KA_w_jOGils
+   Channel: Anton Putra
+   Duration: 514.0 seconds
+   Views: 46,937
+
+8. Lets Build An Event Logging REST API With Rust And Axum
+   URL: https://youtube.com/watch?v=zYjNm6ooUqs
+   Channel: Syed Hussim Dev
+   Duration: 797.0 seconds
+   Views: 1,057
+
+9. Practical Clean Architecture in Rust [with Axum Template]
+   URL: https://youtube.com/watch?v=TrNpyFMtnzI
+   Channel: Green Tea Coding
+   Duration: 1726.0 seconds
+   Views: 21,259
+
+10. Decrusting the axum crate
+   URL: https://youtube.com/watch?v=Wnb_n5YktO8
+   Channel: Jon Gjengset
+   Duration: 7947.0 seconds
+   Views: 97,522
+
