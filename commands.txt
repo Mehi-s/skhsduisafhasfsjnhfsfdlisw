@@ -1,3 +1,1 @@
-search Pointy_hat ::reqid::8e60627c-d7af-4e97-bd26-a30ef0d813df
-search Where_is_the_lions_crest_armor ::reqid::ea72d63a-a259-4c17-bf7a-0a66e9925d79
-recent Diamondbolt ::reqid::5e4abdc0-68c8-4010-9478-4a13cbaf256a
+recent Diamondbolt ::reqid::25e722d1-b7c9-474c-8f8d-d07efe639db6
