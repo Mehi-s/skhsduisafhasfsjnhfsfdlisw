@@ -1,1 +1,3 @@
-search Stam1o ::reqid::9b776cd9-0475-4919-a364-c4242e133ddd
+search dark_souls_1_guide ::reqid::ed271184-9aa0-4b8f-93d1-fb8f054f7d2a
+search Chosen_architect ::reqid::a5c24230-aa6d-4847-aeb3-2e5b740cf935
+recent lexfridman ::reqid::eeb48beb-0907-45f9-af03-430bc88ea755
