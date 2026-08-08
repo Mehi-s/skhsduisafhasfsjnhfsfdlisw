@@ -1,14 +1,19 @@
+# YouTube Downloader Commands
+# Each command on a new line
+# Supported commands:
+#   search [query] - Search YouTube
+#   download [url] - Download video
+#   recent [channel] - Get recent videos from channel
+#   playlist [url] - Download entire playlist
 
-# YouTube Auto Downloader Bot
+# Search for AI tutorials
+search ai programming tutorial 2024
 
-This repository hosts a fully automated YouTube downloader bot using GitHub Actions.
+# Download a specific video
+download https://www.youtube.com/watch?v=dQw4w9WgXcQ
 
-## Features
-- Fetches recent videos from your listed YouTube channels
-- Searches and downloads new videos based on defined queries
-- Automatically commits and pushes videos to this repository
+# Get recent videos from a channel (using @handle or full URL)
+recent @mkbhd
 
-## How to use
-1. Edit `config/channels.txt` to add your favorite channels.
-2. Edit `queries/search_queries.txt` to define search terms.
-3. Push changes — GitHub Actions will do the rest.
+# Download a playlist
+playlist https://www.youtube.com/playlist?list=PLrAXtmErZgOeiKm4sgNOknGvNjby9efdf

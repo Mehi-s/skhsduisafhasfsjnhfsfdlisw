@@ -1,0 +1,43 @@
+name: Squash Repository History
+
+on:
+  schedule:
+    # Runs every hour at minute 0
+    - cron: '0 * * * *'
+  workflow_dispatch:   # manual trigger for testing
+
+jobs:
+  squash:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed for force push
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # get all commits
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"   # ✅ fixed typo
+
+      - name: Squash all commits into one
+        run: |
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          if [ "$COMMIT_COUNT" -le 1 ]; then
+            echo "Nothing to squash (only one commit)."
+            exit 0
+          fi
+
+          BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+          # Reset to the first commit (keep changes in working tree)
+          FIRST_COMMIT=$(git rev-list --max-parents=0 HEAD)
+          git reset "$FIRST_COMMIT"
+          git add -A
+          git commit -m "Squashed history – $(date -u +'%Y-%m-%d %H:%M UTC')" || true
+
+          # Safer force push
+          git push --force-with-lease origin "HEAD:$BRANCH"
